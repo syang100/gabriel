@@ -1,49 +1,74 @@
 package edu.cmu.cs.gabriel;
 
-import java.io.File;
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Timer;
-import java.util.TimerTask;
-
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.Dialog;
+import android.app.ProgressDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.hardware.Camera;
 import android.hardware.Camera.PreviewCallback;
-import android.media.AudioFormat;
-import android.media.AudioRecord;
-import android.media.MediaPlayer;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.media.AudioFormat;
+import android.media.AudioRecord;
+import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
+import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.MediaController;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
+import android.widget.TextView;
 import android.widget.VideoView;
 
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.params.BasicHttpParams;
+import org.apache.http.params.HttpConnectionParams;
+import org.apache.http.params.HttpParams;
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.MalformedURLException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.ExecutionException;
 
 import edu.cmu.cs.gabriel.network.AccStreamingThread;
 import edu.cmu.cs.gabriel.network.AudioStreamingThread;
 import edu.cmu.cs.gabriel.network.ControlThread;
 import edu.cmu.cs.gabriel.network.NetworkProtocol;
-import edu.cmu.cs.gabriel.util.PingThread;
 import edu.cmu.cs.gabriel.network.ResultReceivingThread;
 import edu.cmu.cs.gabriel.network.VideoStreamingThread;
 import edu.cmu.cs.gabriel.token.ReceivedPacketInfo;
 import edu.cmu.cs.gabriel.token.TokenController;
+import edu.cmu.cs.gabriel.util.PingThread;
 import edu.cmu.cs.gabriel.util.ResourceMonitoringService;
 
 public class GabrielClientActivity extends Activity implements TextToSpeech.OnInitListener, SensorEventListener{
@@ -52,6 +77,7 @@ public class GabrielClientActivity extends Activity implements TextToSpeech.OnIn
 
     // major components for streaming sensor data and receiving information
     private String serverIP = null;
+    private String schedulerIP = null;
     private VideoStreamingThread videoStreamingThread = null;
     private AccStreamingThread accStreamingThread = null;
     private AudioStreamingThread audioStreamingThread = null;
@@ -77,12 +103,23 @@ public class GabrielClientActivity extends Activity implements TextToSpeech.OnIn
     // views
     private ImageView imgView = null;
     private VideoView videoView = null;
+    private TextView textView = null;
+    private ImageView imgPreview = null;
+    private Dialog dialog = null;
+    private EditText textSchedulerAddress = null;
+    private EditText textGabrielAddress = null;
+
+    private Button btnRequest = null;
+    private Button btnStart =  null;
 
     // audio
     private AudioRecord audioRecorder = null;
     private Thread audioRecordingThread = null;
     private boolean isAudioRecording = false;
     private int audioBufferSize = -1;
+
+    // demo mode
+    private boolean isTest = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -95,6 +132,18 @@ public class GabrielClientActivity extends Activity implements TextToSpeech.OnIn
 
         imgView = (ImageView) findViewById(R.id.guidance_image);
         videoView = (VideoView) findViewById(R.id.guidance_video);
+
+        dialog = new Dialog(this);
+        dialog.setContentView(R.layout.dialog);
+
+        dialog.setTitle("Wearable Cognitive Assistance");
+        dialog.setCancelable(true);
+
+        textSchedulerAddress = (EditText) dialog.findViewById(R.id.text_scheduler_address);
+        textGabrielAddress = (EditText) dialog.findViewById(R.id.text_gabriel_address);
+
+        serverIP = Const.SERVER_IP;
+        schedulerIP = Const.SCHEDULER_IP;
     }
 
     @Override
@@ -108,13 +157,14 @@ public class GabrielClientActivity extends Activity implements TextToSpeech.OnIn
 //        lp.screenBrightness = 0.01f;
 //        getWindow().setAttributes(lp);
 
-        initOnce();
-        if (Const.IS_EXPERIMENT) { // experiment mode
-            runExperiments();
-        } else { // demo mode
-            serverIP = Const.SERVER_IP;
-            initPerRun(serverIP, Const.TOKEN_SIZE, null);
-        }
+        showDialog();
+//        initOnce();
+//        if (Const.IS_EXPERIMENT) { // experiment mode
+//            runExperiments();
+//        } else { // demo mode
+//            serverIP = Const.SERVER_IP;
+//            initPerRun(serverIP, Const.TOKEN_SIZE, null);
+//        }
     }
 
     @Override
@@ -128,6 +178,72 @@ public class GabrielClientActivity extends Activity implements TextToSpeech.OnIn
     protected void onDestroy() {
         Log.v(LOG_TAG, "++onDestroy");
         super.onDestroy();
+    }
+
+    private void showDialog() {
+        textSchedulerAddress.setText(schedulerIP);
+        textGabrielAddress.setText(serverIP);
+
+        final RadioGroup radioGroup = (RadioGroup) dialog.findViewById(R.id.radio_gabriel_mode);
+
+        btnRequest = (Button) dialog.findViewById(R.id.btn_request_scheduler);
+        btnStart = (Button) dialog.findViewById(R.id.btn_start_gabriel);
+
+        final Button btnExit = (Button) dialog.findViewById(R.id.btn_exit_gabriel);
+
+        btnRequest.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                schedulerIP = textSchedulerAddress.getText().toString();
+                new RequestTask().execute(schedulerIP);
+            }
+        });
+
+        btnStart.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                serverIP = textGabrielAddress.getText().toString();
+                isTest = ((RadioButton) radioGroup.findViewById(radioGroup.getCheckedRadioButtonId())).getText().equals("Test");
+                try {
+                    int status = ((Integer) new StartTask().execute(serverIP).get()).intValue();
+                    if (status != 200) {
+                        AlertDialog alertDialog = new AlertDialog.Builder(GabrielClientActivity.this).create();
+                        alertDialog.setTitle("Alert");
+                        alertDialog.setMessage("Gabriel service is not available.");
+                        alertDialog.setButton(AlertDialog.BUTTON_NEUTRAL, "OK",
+                                new DialogInterface.OnClickListener() {
+                                    public void onClick(DialogInterface dialog, int which) {
+                                        dialog.dismiss();
+                                    }
+                                });
+                        alertDialog.show();
+                        return;
+                    }
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } catch (ExecutionException e) {
+                    e.printStackTrace();
+                }
+                initOnce();
+                if (Const.IS_EXPERIMENT) {
+                    runExperiments();
+                 } else {
+                    initPerRun(serverIP, Const.TOKEN_SIZE, null);
+                    dialog.dismiss();
+                }
+            }
+        });
+
+        btnExit.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                dialog.cancel();
+                GabrielClientActivity.this.finish();
+            }
+        });
+
+
+        dialog.show();
     }
 
     /**
@@ -144,6 +260,11 @@ public class GabrielClientActivity extends Activity implements TextToSpeech.OnIn
             reusedBuffer = new byte[1920 * 1080 * 3 / 2]; // 1.5 bytes per pixel
             mCamera.addCallbackBuffer(reusedBuffer);
         }
+
+        textView = (TextView) findViewById(R.id.guidance_text);
+        textView.setMovementMethod(new ScrollingMovementMethod());
+
+        imgPreview = (ImageView) findViewById(R.id.image_preview);
 
         Const.ROOT_DIR.mkdirs();
         Const.EXP_DIR.mkdirs();
@@ -254,7 +375,7 @@ public class GabrielClientActivity extends Activity implements TextToSpeech.OnIn
         resultThread.start();
 
         if (Const.SENSOR_VIDEO) {
-            videoStreamingThread = new VideoStreamingThread(serverIP, Const.VIDEO_STREAM_PORT, returnMsgHandler, tokenController, mCamera);
+            videoStreamingThread = new VideoStreamingThread(serverIP, Const.VIDEO_STREAM_PORT, returnMsgHandler, tokenController, mCamera, imgPreview, isTest);
             videoStreamingThread.start();
         }
 
@@ -365,7 +486,7 @@ public class GabrielClientActivity extends Activity implements TextToSpeech.OnIn
                         mCamera.addCallbackBuffer(reusedBuffer);
                     }
                     if (videoStreamingThread == null) {
-                        videoStreamingThread = new VideoStreamingThread(serverIP, Const.VIDEO_STREAM_PORT, returnMsgHandler, tokenController, mCamera);
+                        videoStreamingThread = new VideoStreamingThread(serverIP, Const.VIDEO_STREAM_PORT, returnMsgHandler, tokenController, mCamera, imgPreview, isTest);
                         videoStreamingThread.start();
                     }
                 } else { // turning off
@@ -460,14 +581,17 @@ public class GabrielClientActivity extends Activity implements TextToSpeech.OnIn
      */
     private Handler returnMsgHandler = new Handler() {
         public void handleMessage(Message msg) {
+
             if (msg.what == NetworkProtocol.NETWORK_RET_FAILED) {
                 //terminate();
             }
-            if (msg.what == NetworkProtocol.NETWORK_RET_MESSAGE) {
+            else if (msg.what == NetworkProtocol.NETWORK_RET_MESSAGE) {
                 receivedPacketInfo = (ReceivedPacketInfo) msg.obj;
                 receivedPacketInfo.setMsgRecvTime(System.currentTimeMillis());
+
+                textView.append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new Date(receivedPacketInfo.msgRecvTime)) + " " + receivedPacketInfo.status + "\n");
             }
-            if (msg.what == NetworkProtocol.NETWORK_RET_SPEECH) {
+            else if (msg.what == NetworkProtocol.NETWORK_RET_SPEECH) {
                 String ttsMessage = (String) msg.obj;
 
                 if (tts != null){
@@ -491,7 +615,7 @@ public class GabrielClientActivity extends Activity implements TextToSpeech.OnIn
                     }
                 }
             }
-            if (msg.what == NetworkProtocol.NETWORK_RET_IMAGE || msg.what == NetworkProtocol.NETWORK_RET_ANIMATION) {
+            else if (msg.what == NetworkProtocol.NETWORK_RET_IMAGE || msg.what == NetworkProtocol.NETWORK_RET_ANIMATION) {
                 Bitmap feedbackImg = (Bitmap) msg.obj;
                 imgView = (ImageView) findViewById(R.id.guidance_image);
                 videoView = (VideoView) findViewById(R.id.guidance_video);
@@ -499,7 +623,7 @@ public class GabrielClientActivity extends Activity implements TextToSpeech.OnIn
                 videoView.setVisibility(View.GONE);
                 imgView.setImageBitmap(feedbackImg);
             }
-            if (msg.what == NetworkProtocol.NETWORK_RET_VIDEO) {
+            else if (msg.what == NetworkProtocol.NETWORK_RET_VIDEO) {
                 String url = (String) msg.obj;
                 imgView.setVisibility(View.GONE);
                 videoView.setVisibility(View.VISIBLE);
@@ -513,10 +637,10 @@ public class GabrielClientActivity extends Activity implements TextToSpeech.OnIn
                 });
                 videoView.start();
             }
-            if (msg.what == NetworkProtocol.NETWORK_RET_DONE) {
+            else if (msg.what == NetworkProtocol.NETWORK_RET_DONE) {
                 notifyToken();
             }
-            if (msg.what == NetworkProtocol.NETWORK_RET_CONFIG) {
+            else if (msg.what == NetworkProtocol.NETWORK_RET_CONFIG) {
                 String controlMsg = (String) msg.obj;
                 processServerControl(controlMsg);
             }
@@ -581,6 +705,119 @@ public class GabrielClientActivity extends Activity implements TextToSpeech.OnIn
             stopAudioRecording();
         }
         stopResourceMonitoring();
+    }
+
+    @Override
+    public void onBackPressed() {
+        super.onBackPressed();
+        try {
+            new StopTask().execute(serverIP).get();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (ExecutionException e) {
+            e.printStackTrace();
+        }
+        this.finish();
+    }
+
+    private class RequestTask extends AsyncTask<String, Integer, String> {
+        private ProgressDialog dialog = new ProgressDialog(GabrielClientActivity.this);
+
+        @Override
+        protected String doInBackground(String... urls) {
+            String content = null;
+            try {
+                HttpParams httpParameters = new BasicHttpParams();
+                HttpConnectionParams.setConnectionTimeout(httpParameters, 5000);
+                HttpConnectionParams.setSoTimeout(httpParameters, 5000);
+                HttpClient client = new DefaultHttpClient(httpParameters);
+                HttpGet get = new HttpGet("http://" + urls[0] + ":23633/request");
+                HttpResponse response = client.execute(get);
+                BufferedReader reader = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
+                content = reader.readLine();
+            } catch (MalformedURLException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            return content;
+        }
+        @Override
+        protected void onPreExecute() {
+            dialog.show();
+        }
+        @Override
+        protected void onPostExecute(final String result) {
+            dialog.dismiss();
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    textGabrielAddress.setText(result);
+                }
+            });
+        }
+    }
+
+    private class StartTask extends AsyncTask<String, Integer, Integer> {
+        private ProgressDialog dialog = new ProgressDialog(GabrielClientActivity.this);
+
+        @Override
+        protected Integer doInBackground(String... urls) {
+            int status = 404;
+            try {
+                HttpParams httpParameters = new BasicHttpParams();
+                HttpConnectionParams.setConnectionTimeout(httpParameters, 5000);
+                HttpConnectionParams.setSoTimeout(httpParameters, 5000);
+                HttpClient client = new DefaultHttpClient(httpParameters);
+                HttpGet get = new HttpGet("http://" + urls[0] + ":23633/start");
+                HttpResponse response = client.execute(get);
+                status = response.getStatusLine().getStatusCode();
+            } catch (MalformedURLException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            return status;
+        }
+        @Override
+        protected void onPreExecute() {
+            dialog.show();
+        }
+        @Override
+        protected void onPostExecute(final Integer result) {
+            dialog.dismiss();
+        }
+    }
+
+    private class StopTask extends AsyncTask<String, Integer, Integer> {
+        private ProgressDialog dialog = new ProgressDialog(GabrielClientActivity.this);
+
+        @Override
+        protected Integer doInBackground(String... urls) {
+            int status = 404;
+            try {
+                HttpParams httpParameters = new BasicHttpParams();
+                HttpConnectionParams.setConnectionTimeout(httpParameters, 5000);
+                HttpConnectionParams.setSoTimeout(httpParameters, 5000);
+                HttpClient client = new DefaultHttpClient(httpParameters);
+                HttpGet get = new HttpGet("http://" + urls[0] + ":23633/stop");
+                HttpResponse response = client.execute(get);
+                status = response.getStatusLine().getStatusCode();
+            } catch (MalformedURLException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            return status;
+        }
+        @Override
+        protected void onPreExecute() {
+            dialog.show();
+        }
+        @Override
+        protected void onPostExecute(final Integer result) {
+            dialog.dismiss();
+        }
     }
 
     /**************** SensorEventListener ***********************/

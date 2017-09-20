@@ -1,16 +1,19 @@
 package edu.cmu.cs.gabriel;
 
-import java.io.File;
-
 import android.media.AudioFormat;
 import android.os.Environment;
+
+import java.io.File;
 
 public class Const {
     // whether to do a demo or a set of experiments
     public static final boolean IS_EXPERIMENT = false;
 
     // whether to use real-time captured images or load images from files for testing
-    public static final boolean LOAD_IMAGES = false;
+//    public static final boolean LOAD_IMAGES = true;
+
+    // whether to save video frame for future experiments
+    public static final boolean SAVE_IMAGES = false;
 
     // high level sensor control (on/off)
     public static boolean SENSOR_VIDEO = true;
@@ -36,9 +39,9 @@ public class Const {
     public static final int CONTROL_PORT = 22222;
 
     // load images (JPEG) from files and pretend they are just captured by the camera
-    public static final String APP_NAME = "pool";
+    public static final String APP_NAME = "lego";
     public static final File TEST_IMAGE_DIR = new File (ROOT_DIR.getAbsolutePath() +
-            File.separator + "images-" + APP_NAME + File.separator);
+            File.separator + APP_NAME + File.separator);
 
     // may include background pinging to keep network active
     public static final boolean BACKGROUND_PING = false;
@@ -51,7 +54,12 @@ public class Const {
 
     /************************ Demo mode only *************************************/
     // server IP
-    public static final String SERVER_IP = "128.2.213.106";  // Cloudlet
+//    public static final String SERVER_IP = "34.208.98.196";  // Cloud
+    public static final String SERVER_IP = "";  // Cloudlet
+
+    // scheduling server IP
+//    public static final String SCHEDULER_IP = "192.168.10.25";
+    public static final String SCHEDULER_IP = "192.168.86.110";
 
     // token size
     public static final int TOKEN_SIZE = 1;
@@ -59,7 +67,7 @@ public class Const {
     /************************ Experiment mode only *******************************/
     // server IP list
     public static final String[] SERVER_IP_LIST = {
-            "128.2.213.106",
+            "34.208.98.196",
             };
 
     // token size list
@@ -77,4 +85,13 @@ public class Const {
     
     // result file
     public static final File EXP_DIR = new File(ROOT_DIR.getAbsolutePath() + File.separator + "exp");
+
+    static {
+        try {
+            TEST_IMAGE_DIR.mkdirs();
+        } catch (Exception e) {
+            // Do nothing...
+        }
+    }
+
 }

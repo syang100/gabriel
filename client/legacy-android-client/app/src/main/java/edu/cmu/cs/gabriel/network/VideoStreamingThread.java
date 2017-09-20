@@ -1,22 +1,5 @@
 package edu.cmu.cs.gabriel.network;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FilenameFilter;
-import java.io.IOException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.Socket;
-import java.net.UnknownHostException;
-import java.util.Arrays;
-
-import org.json.JSONException;
-import org.json.JSONObject;
-
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Rect;
@@ -28,6 +11,23 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.util.Log;
+import android.widget.ImageView;
+
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FilenameFilter;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.net.UnknownHostException;
+import java.util.Arrays;
+import java.util.Date;
+
 import edu.cmu.cs.gabriel.Const;
 import edu.cmu.cs.gabriel.token.TokenController;
 
@@ -38,6 +38,8 @@ public class VideoStreamingThread extends Thread {
     private boolean isRunning = false;
 
     private Camera mCamera = null;
+
+    private ImageView mImageView = null;
     
     // image files for experiments (test and compression)
     private File[] imageFiles = null;
@@ -63,11 +65,15 @@ public class VideoStreamingThread extends Thread {
     private Handler networkHandler = null;
     private TokenController tokenController = null;
 
-    public VideoStreamingThread(String serverIP, int port, Handler handler, TokenController tokenController, Camera camera) {
+    private boolean mIsTest = false;
+
+    public VideoStreamingThread(String serverIP, int port, Handler handler, TokenController tokenController, Camera camera, ImageView imageView, boolean isTest) {
         isRunning = false;
         this.networkHandler = handler;
         this.tokenController = tokenController;
         this.mCamera = camera;
+        this.mImageView = imageView;
+        this.mIsTest = isTest;
 
         try {
             remoteIP = InetAddress.getByName(serverIP);
@@ -76,7 +82,7 @@ public class VideoStreamingThread extends Thread {
         }
         remotePort = port;
 
-        if (Const.LOAD_IMAGES) {
+        if (mIsTest) {
             // check input data at image directory
             imageFiles = this.getImageFiles(Const.TEST_IMAGE_DIR);
             if (imageFiles.length == 0) {
@@ -168,8 +174,15 @@ public class VideoStreamingThread extends Thread {
                             frameLock.wait();
                         } catch (InterruptedException e) {}
                     }
+
                     data = this.frameBuffer;
                     dataTime = System.currentTimeMillis();
+
+                    try {
+                        mImageView.setImageBitmap(BitmapFactory.decodeByteArray(data, 0, data.length));
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
 
                     if (Const.IS_EXPERIMENT) { // compress pre-loaded file in experiment mode
                         long tStartCompressing = System.currentTimeMillis();
@@ -215,9 +228,9 @@ public class VideoStreamingThread extends Thread {
      * Puts the new frame into the @frameBuffer
      */
     public void push(byte[] frame, Parameters parameters) {
-        Log.v(LOG_TAG, "push");
+        Log.v(LOG_TAG, "push @ " + new Date());
         
-        if (!Const.LOAD_IMAGES){ // use real-time captured images
+        if (!mIsTest){ // use real-time captured images
             synchronized (frameLock) {
                 Size cameraImageSize = parameters.getPreviewSize();
                 YuvImage image = new YuvImage(frame, parameters.getPreviewFormat(), cameraImageSize.width,
@@ -226,6 +239,15 @@ public class VideoStreamingThread extends Thread {
                 // chooses quality 67 and it roughly matches quality 5 in avconv
                 image.compressToJpeg(new Rect(0, 0, image.getWidth(), image.getHeight()), 67, tmpBuffer);
                 this.frameBuffer = tmpBuffer.toByteArray();
+                if (Const.SAVE_IMAGES) {
+                    try {
+                        FileOutputStream fos = new FileOutputStream(Const.TEST_IMAGE_DIR + File.separator + frameID + ".jpg");
+                        fos.write(this.frameBuffer);
+                        fos.close();
+                    } catch (IOException e) {
+                        // Do nothing...
+                    }
+                }
                 this.frameID++;
                 frameLock.notify();
             }
@@ -241,7 +263,7 @@ public class VideoStreamingThread extends Thread {
                     this.frameID++;
                     frameLock.notify();
                 }
-                indexImageFile = (indexImageFile + 1) % this.imageFiles.length;
+                indexImageFile = (indexImageFile + 3) % this.imageFiles.length;
             } catch (FileNotFoundException e) {
             } catch (IOException e) {
             }
