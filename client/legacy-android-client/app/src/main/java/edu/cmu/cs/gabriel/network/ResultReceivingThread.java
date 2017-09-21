@@ -1,6 +1,17 @@
 
 package edu.cmu.cs.gabriel.network;
 
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.os.Handler;
+import android.os.Message;
+import android.util.Base64;
+import android.util.Log;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -11,16 +22,6 @@ import java.net.UnknownHostException;
 import java.util.Timer;
 import java.util.TimerTask;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.os.Handler;
-import android.os.Message;
-import android.util.Base64;
-import android.util.Log;
 import edu.cmu.cs.gabriel.token.ReceivedPacketInfo;
 
 public class ResultReceivingThread extends Thread {
@@ -44,6 +45,8 @@ public class ResultReceivingThread extends Thread {
     private int[] animationPeriods = new int[10]; // how long each frame is shown, in millisecond
     private int animationDisplayIdx = -1;
     private int nAnimationFrames = -1;
+
+    private int currentState = 0; // 0 for the beginning, -1 for completion
 
 
     public ResultReceivingThread(String serverIP, int port, Handler returnMsgHandler) {
@@ -157,6 +160,8 @@ public class ResultReceivingThread extends Thread {
             JSONObject resultJSON = null;
             try {
                 resultJSON = new JSONObject(result);
+                Log.i(LOG_TAG, resultJSON.toString(2));
+                currentState = resultJSON.optInt("progress", currentState);
             } catch (JSONException e) {
                 Log.e(LOG_TAG, "Result message not in correct JSON format");
             }

@@ -263,7 +263,7 @@ public class VideoStreamingThread extends Thread {
                     this.frameID++;
                     frameLock.notify();
                 }
-                indexImageFile = (indexImageFile + 3) % this.imageFiles.length;
+                indexImageFile = (indexImageFile+3) % this.imageFiles.length;
             } catch (FileNotFoundException e) {
             } catch (IOException e) {
             }

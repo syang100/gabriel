@@ -55,7 +55,7 @@ public class Const {
     /************************ Demo mode only *************************************/
     // server IP
 //    public static final String SERVER_IP = "34.208.98.196";  // Cloud
-    public static final String SERVER_IP = "";  // Cloudlet
+    public static final String SERVER_IP = "192.168.86.110";  // Cloudlet
 
     // scheduling server IP
 //    public static final String SCHEDULER_IP = "192.168.10.25";

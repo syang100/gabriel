@@ -735,9 +735,8 @@ public class GabrielClientActivity extends Activity implements TextToSpeech.OnIn
                 HttpResponse response = client.execute(get);
                 BufferedReader reader = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
                 content = reader.readLine();
-            } catch (MalformedURLException e) {
-                e.printStackTrace();
-            } catch (IOException e) {
+                Thread.sleep(3000L);
+            } catch (Exception e) {
                 e.printStackTrace();
             }
             return content;
