@@ -108,6 +108,13 @@ public class ResultReceivingThread extends Thread {
         return receivedString;
     }
 
+    public int getCurrentState() {
+        return currentState;
+    }
+
+    public void setCurrentState(int state) {
+        currentState = state;
+    }
 
     private void notifyReceivedData(String recvData) {
         // convert the message to JSON
@@ -247,7 +254,7 @@ public class ResultReceivingThread extends Thread {
             if (isRunning)
                 timer.schedule(new animationTask(), animationPeriods[animationDisplayIdx]);
         }
-    };
+    }
 
     public void close() {
         this.isRunning = false;

@@ -1,10 +1,8 @@
 package edu.cmu.cs.gabriel;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.app.Dialog;
 import android.app.ProgressDialog;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.hardware.Camera;
@@ -118,6 +116,8 @@ public class GabrielClientActivity extends Activity implements TextToSpeech.OnIn
     private boolean isAudioRecording = false;
     private int audioBufferSize = -1;
 
+    private int currentState = 0;
+
     // demo mode
     private boolean isTest = false;
 
@@ -170,6 +170,7 @@ public class GabrielClientActivity extends Activity implements TextToSpeech.OnIn
     @Override
     protected void onPause() {
         Log.v(LOG_TAG, "++onPause");
+        updateCurrentState();
         this.terminate();
         super.onPause();
     }
@@ -204,26 +205,26 @@ public class GabrielClientActivity extends Activity implements TextToSpeech.OnIn
             public void onClick(View view) {
                 serverIP = textGabrielAddress.getText().toString();
                 isTest = ((RadioButton) radioGroup.findViewById(radioGroup.getCheckedRadioButtonId())).getText().equals("Test");
-                try {
-                    int status = ((Integer) new StartTask().execute(serverIP).get()).intValue();
-                    if (status != 200) {
-                        AlertDialog alertDialog = new AlertDialog.Builder(GabrielClientActivity.this).create();
-                        alertDialog.setTitle("Alert");
-                        alertDialog.setMessage("Gabriel service is not available.");
-                        alertDialog.setButton(AlertDialog.BUTTON_NEUTRAL, "OK",
-                                new DialogInterface.OnClickListener() {
-                                    public void onClick(DialogInterface dialog, int which) {
-                                        dialog.dismiss();
-                                    }
-                                });
-                        alertDialog.show();
-                        return;
-                    }
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                } catch (ExecutionException e) {
-                    e.printStackTrace();
-                }
+//                try {
+//                    int status = ((Integer) new StartTask().execute(serverIP).get()).intValue();
+//                    if (status != 200) {
+//                        AlertDialog alertDialog = new AlertDialog.Builder(GabrielClientActivity.this).create();
+//                        alertDialog.setTitle("Alert");
+//                        alertDialog.setMessage("Gabriel service is not available.");
+//                        alertDialog.setButton(AlertDialog.BUTTON_NEUTRAL, "OK",
+//                                new DialogInterface.OnClickListener() {
+//                                    public void onClick(DialogInterface dialog, int which) {
+//                                        dialog.dismiss();
+//                                    }
+//                                });
+//                        alertDialog.show();
+//                        return;
+//                    }
+//                } catch (InterruptedException e) {
+//                    e.printStackTrace();
+//                } catch (ExecutionException e) {
+//                    e.printStackTrace();
+//                }
                 initOnce();
                 if (Const.IS_EXPERIMENT) {
                     runExperiments();
@@ -231,6 +232,8 @@ public class GabrielClientActivity extends Activity implements TextToSpeech.OnIn
                     initPerRun(serverIP, Const.TOKEN_SIZE, null);
                     dialog.dismiss();
                 }
+
+                populateCurrentState();
             }
         });
 
@@ -241,7 +244,6 @@ public class GabrielClientActivity extends Activity implements TextToSpeech.OnIn
                 GabrielClientActivity.this.finish();
             }
         });
-
 
         dialog.show();
     }
@@ -336,7 +338,7 @@ public class GabrielClientActivity extends Activity implements TextToSpeech.OnIn
                 try {
                     Thread.sleep(20 * 1000);
                 } catch (InterruptedException e) {}
-                controlThread.sendControlMsg("ping");
+//                controlThread.sendControlMsg("ping");
                 // wait a while for ping to finish...
                 try {
                     Thread.sleep(5 * 1000);
@@ -364,7 +366,7 @@ public class GabrielClientActivity extends Activity implements TextToSpeech.OnIn
         controlThread.start();
 
         if (Const.IS_EXPERIMENT) {
-            controlThread.sendControlMsg("ping");
+//            controlThread.sendControlMsg("ping");
             // wait a while for ping to finish...
             try {
                 Thread.sleep(5 * 1000);
@@ -754,6 +756,24 @@ public class GabrielClientActivity extends Activity implements TextToSpeech.OnIn
                     textGabrielAddress.setText(result);
                 }
             });
+        }
+    }
+
+    private void updateCurrentState() {
+        currentState = resultThread.getCurrentState();
+        Log.v(LOG_TAG, "Obtaining current state: " + currentState);
+    }
+
+    private void populateCurrentState() {
+        resultThread.setCurrentState(currentState);
+        JSONObject obj = null;
+        try {
+            obj = new JSONObject();
+            obj.put("progress", currentState);
+            controlThread.sendControlMsg(obj.toString()); // TODO: process this in the server
+            Log.v(LOG_TAG, "Pushing current state: " + currentState);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
