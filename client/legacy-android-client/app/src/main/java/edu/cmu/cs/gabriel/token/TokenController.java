@@ -54,7 +54,7 @@ public class TokenController {
     public Handler tokenHandler = new Handler() {
 
         public void handleMessage(Message msg) {
-            if (msg.what == NetworkProtocol.NETWORK_RET_SYNC) {
+            if (msg.what == NetworkProtocol.NETWORK_RET_PING) {
                 try {
                     if (Const.IS_EXPERIMENT){
                         String log = (String) msg.obj;

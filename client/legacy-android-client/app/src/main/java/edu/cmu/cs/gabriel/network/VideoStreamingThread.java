@@ -67,6 +67,8 @@ public class VideoStreamingThread extends Thread {
 
     private boolean mIsTest = false;
 
+    private int currentState = 0;
+
     public VideoStreamingThread(String serverIP, int port, Handler handler, TokenController tokenController, Camera camera, ImageView imageView, boolean isTest) {
         isRunning = false;
         this.networkHandler = handler;
@@ -201,7 +203,9 @@ public class VideoStreamingThread extends Thread {
                 // make it as a single packet
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 DataOutputStream dos = new DataOutputStream(baos);
-                byte[] header = ("{\"" + NetworkProtocol.HEADER_MESSAGE_FRAME_ID + "\":" + sendingFrameID + "}").getBytes();
+                byte[] header = ("{\"" + NetworkProtocol.HEADER_MESSAGE_FRAME_ID + "\":" + sendingFrameID +
+                        "," + "\"progress\":" + currentState +
+                        "}").getBytes();
                 dos.writeInt(header.length);
                 dos.write(header);
                 dos.writeInt(data.length);
@@ -296,6 +300,14 @@ public class VideoStreamingThread extends Thread {
         data.putString("message", message);
         msg.setData(data);
         this.networkHandler.sendMessage(msg);
+    }
+
+    public int getCurrentState() {
+        return currentState;
+    }
+
+    public void setCurrentState(int state) {
+        currentState = state;
     }
 
 }

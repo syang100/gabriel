@@ -12,7 +12,8 @@ public class NetworkProtocol {
     public static final int NETWORK_RET_ANIMATION = 7;
     public static final int NETWORK_RET_MESSAGE = 8;
     public static final int NETWORK_RET_DONE = 9;
-    public static final int NETWORK_RET_SYNC = 10;
+    public static final int NETWORK_RET_PING = 10;
+    public static final int NETWORK_RET_SYNC = 11;
 
     public static final String HEADER_MESSAGE_CONTROL = "control";
     public static final String HEADER_MESSAGE_RESULT = "result";

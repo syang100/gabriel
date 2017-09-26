@@ -44,6 +44,8 @@ public class ControlThread extends Thread {
     private Handler mainHandler = null;
     private TokenController tokenController = null;
 
+    private int currentState = 0;
+
     public ControlThread(String serverIP, int port, Handler handler, TokenController tokenController) {
         isRunning = false;
         this.mainHandler = handler;
@@ -159,7 +161,7 @@ public class ControlThread extends Thread {
 
                     // send message to token controller, actually for logging...
                     Message msg = Message.obtain();
-                    msg.what = NetworkProtocol.NETWORK_RET_SYNC;
+                    msg.what = NetworkProtocol.NETWORK_RET_PING;
                     String sync_str = "" + bestSentTime + "\t" + bestServerTime + "\t" + bestRecvTime + "\n";
                     msg.obj = sync_str;
                     Log.i(LOG_TAG, sync_str);
@@ -174,9 +176,35 @@ public class ControlThread extends Thread {
                     this.isRunning = false;
                     return;
                 }
+            } else if (command.equals("sync")) {
+                try {
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    DataOutputStream dos = new DataOutputStream(baos);
+                    byte[] jsonData = ("{\"progress\":" + currentState + "}").getBytes();
+                    dos.writeInt(jsonData.length);
+                    dos.write(jsonData);
+                    networkWriter.write(baos.toByteArray());
+                    networkWriter.flush();
+                } catch (SocketException e) {
+                    Log.v(LOG_TAG, "no server command");
+                } catch (IOException e) {
+                    Log.e(LOG_TAG, "Error in sending packet: " + e);
+                    this.notifyError(e.getMessage());
+                    this.isRunning = false;
+                    return;
+                }
+
             }
         }
         this.isRunning = false;
+    }
+
+    public int getCurrentState() {
+        return currentState;
+    }
+
+    public void setCurrentState(int state) {
+        currentState = state;
     }
 
     /**
