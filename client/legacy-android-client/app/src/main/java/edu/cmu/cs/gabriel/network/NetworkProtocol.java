@@ -20,6 +20,7 @@ public class NetworkProtocol {
     public static final String HEADER_MESSAGE_INJECT_TOKEN = "token_inject";
     public static final String HEADER_MESSAGE_FRAME_ID = "frame_id";
     public static final String HEADER_MESSAGE_ENGINE_ID = "engine_id";
+    public static final String HEADER_MESSAGE_PROGRESS = "progress";
 
     public static final String SENSOR_TYPE_KEY = "sensor_type";
     public static final String SENSOR_JPEG = "mjpeg";

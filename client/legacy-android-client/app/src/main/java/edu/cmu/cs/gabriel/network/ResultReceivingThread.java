@@ -167,7 +167,6 @@ public class ResultReceivingThread extends Thread {
             JSONObject resultJSON = null;
             try {
                 resultJSON = new JSONObject(result);
-                Log.i(LOG_TAG, resultJSON.toString(2));
                 currentState = resultJSON.optInt("progress", currentState);
             } catch (JSONException e) {
                 Log.e(LOG_TAG, "Result message not in correct JSON format");

@@ -766,9 +766,10 @@ public class GabrielClientActivity extends Activity implements TextToSpeech.OnIn
 
     private void populateCurrentState() {
         resultThread.setCurrentState(currentState);
-        controlThread.setCurrentState(currentState);
+//        controlThread.setCurrentState(currentState);
         videoStreamingThread.setCurrentState(currentState);
-        controlThread.sendControlMsg("sync"); // TODO: process this in the server
+//        controlThread.sendControlMsg("sync"); // TODO: process this in the server
+        Log.v(LOG_TAG, "Pushing current state: " + currentState);
     }
 
     private class StartTask extends AsyncTask<String, Integer, Integer> {

@@ -204,8 +204,9 @@ public class VideoStreamingThread extends Thread {
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 DataOutputStream dos = new DataOutputStream(baos);
                 byte[] header = ("{\"" + NetworkProtocol.HEADER_MESSAGE_FRAME_ID + "\":" + sendingFrameID +
-                        "," + "\"progress\":" + currentState +
+                        (currentState <= 0 ? "" : ",\"" + NetworkProtocol.HEADER_MESSAGE_PROGRESS + "\":" + currentState) +
                         "}").getBytes();
+                currentState = 0; // Only sent once when with a non-zero value
                 dos.writeInt(header.length);
                 dos.write(header);
                 dos.writeInt(data.length);

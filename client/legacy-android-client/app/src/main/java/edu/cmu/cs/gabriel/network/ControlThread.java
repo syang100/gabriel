@@ -44,7 +44,7 @@ public class ControlThread extends Thread {
     private Handler mainHandler = null;
     private TokenController tokenController = null;
 
-    private int currentState = 0;
+    private int currentState = 0; // unused
 
     public ControlThread(String serverIP, int port, Handler handler, TokenController tokenController) {
         isRunning = false;
